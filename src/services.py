@@ -228,16 +228,25 @@ def query_mistakes(subject_id=None, chapter_id=None, is_favorite=None,
 
 
 def toggle_favorite(mistake_id):
-    """切换收藏状态，返回新状态。"""
+    """切换收藏状态。标记收藏时自动取消熟练，返回新状态。"""
     conn = get_connection()
-    cur = conn.execute("SELECT is_favorite FROM mistakes WHERE id = ?", (mistake_id,))
+    cur = conn.execute("SELECT is_favorite, is_mastered FROM mistakes WHERE id = ?", (mistake_id,))
     row = cur.fetchone()
     if not row:
         conn.close()
         return None
     new_val = 0 if row["is_favorite"] else 1
-    conn.execute("UPDATE mistakes SET is_favorite = ?, updated_at = datetime('now','localtime') WHERE id = ?",
-                 (new_val, mistake_id))
+    if new_val == 1:
+        # 收藏时自动取消熟练（互斥）
+        conn.execute(
+            "UPDATE mistakes SET is_favorite = 1, is_mastered = 0, updated_at = datetime('now','localtime') WHERE id = ?",
+            (mistake_id,),
+        )
+    else:
+        conn.execute(
+            "UPDATE mistakes SET is_favorite = 0, updated_at = datetime('now','localtime') WHERE id = ?",
+            (mistake_id,),
+        )
     conn.commit()
     conn.close()
     return new_val

@@ -77,11 +77,9 @@ def _single_entry_form():
 
     note = st.text_area("备注", height=60, key="s_note")
 
-    col_fav, col_mas, col_img = st.columns(3)
-    with col_fav:
-        is_fav = st.checkbox("收藏此题", key="s_fav")
-    with col_mas:
-        is_mas = st.checkbox("已熟练掌握", key="s_mas")
+    col_status, col_img = st.columns([1, 1])
+    with col_status:
+        status = st.radio("状态", ["普通", "⭐ 收藏", "🎯 熟练"], horizontal=True, key="s_status")
     with col_img:
         uploaded = st.file_uploader("📷 题目图片（可选）", type=["png", "jpg", "jpeg", "gif", "bmp"], key="s_img")
 
@@ -94,6 +92,8 @@ def _single_entry_form():
             return
         # 先保存图片
         image_path = save_uploaded_image(uploaded, DB_DIR) if uploaded else ""
+        is_fav = 1 if status == "⭐ 收藏" else 0
+        is_mas = 1 if status == "🎯 熟练" else 0
         data = {
             "subject_id": subj_id,
             "chapter_id": chapter_id,
@@ -104,8 +104,8 @@ def _single_entry_form():
             "knowledge_points": knowledge.strip(),
             "source": source,
             "difficulty": difficulty,
-            "is_favorite": 1 if is_fav else 0,
-            "is_mastered": 1 if is_mas else 0,
+            "is_favorite": is_fav,
+            "is_mastered": is_mas,
             "note": note.strip(),
             "next_review_date": date.today().isoformat(),
             "image_path": image_path,
@@ -289,11 +289,13 @@ def _show_edit_form(mistake_id):
         solution = st.text_area("正确解法", value=m["solution"] or "", height=120, key="edit_sol")
         knowledge = st.text_area("关键知识点", value=m["knowledge_points"] or "", height=100, key="edit_kp")
 
-    col_f, col_m = st.columns(2)
-    with col_f:
-        is_fav = st.checkbox("收藏", value=bool(m["is_favorite"]), key="edit_fav")
-    with col_m:
-        is_mas = st.checkbox("熟练", value=bool(m["is_mastered"]), key="edit_mas")
+    # 互斥状态：收藏和熟练二选一
+    current_status = "🎯 熟练" if m["is_mastered"] else ("⭐ 收藏" if m["is_favorite"] else "普通")
+    status = st.radio("状态", ["普通", "⭐ 收藏", "🎯 熟练"],
+                      index=["普通", "⭐ 收藏", "🎯 熟练"].index(current_status),
+                      horizontal=True, key="edit_status")
+    is_fav = 1 if status == "⭐ 收藏" else 0
+    is_mas = 1 if status == "🎯 熟练" else 0
 
     note = st.text_area("备注", value=m["note"] or "", height=60, key="edit_note")
 
@@ -316,8 +318,8 @@ def _show_edit_form(mistake_id):
                 "title": title.strip(), "content": content.strip(),
                 "wrong_reason": wrong_reason.strip(), "solution": solution.strip(),
                 "knowledge_points": knowledge.strip(), "source": source,
-                "difficulty": difficulty, "is_favorite": 1 if is_fav else 0,
-                "is_mastered": 1 if is_mas else 0, "note": note.strip(),
+                "difficulty": difficulty, "is_favorite": is_fav,
+                "is_mastered": is_mas, "note": note.strip(),
             }
             # 上传了新图片则替换
             if edit_uploaded:
