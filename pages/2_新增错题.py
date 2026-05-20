@@ -58,7 +58,7 @@ def _single_entry_form():
     with col4:
         source = st.selectbox("来源", SOURCES, key="s_src")
     with col5:
-        next_review = st.date_input("下次复习日期", value=date.today(), key="s_next")
+        st.caption(f"📅 首次复习日期：{date.today().isoformat()}（系统自动设定）")
 
     st.markdown("---")
     col_a, col_b = st.columns(2)
@@ -98,7 +98,7 @@ def _single_entry_form():
             "is_favorite": 1 if is_fav else 0,
             "is_mastered": 1 if is_mas else 0,
             "note": note.strip(),
-            "next_review_date": next_review.isoformat() if next_review else None,
+            "next_review_date": date.today().isoformat(),
         }
         mid = create_mistake(data)
         st.success(f"错题已保存！ID: {mid}")
@@ -268,13 +268,8 @@ def _show_edit_form(mistake_id):
         src_idx = src_opts.index(m["source"]) if m["source"] in src_opts else 0
         source = st.selectbox("来源", src_opts, index=src_idx, key="edit_src")
     with col3:
-        next_date = date.today()
-        if m["next_review_date"]:
-            try:
-                next_date = date.fromisoformat(m["next_review_date"])
-            except ValueError:
-                pass
-        next_review = st.date_input("下次复习日期", value=next_date, key="edit_next")
+        next_str = m["next_review_date"] or "未设定"
+        st.caption(f"📅 下次复习日期：{next_str}（系统管理）")
 
     col_a, col_b = st.columns(2)
     with col_a:
@@ -302,7 +297,6 @@ def _show_edit_form(mistake_id):
                 "knowledge_points": knowledge.strip(), "source": source,
                 "difficulty": difficulty, "is_favorite": 1 if is_fav else 0,
                 "is_mastered": 1 if is_mas else 0, "note": note.strip(),
-                "next_review_date": next_review.isoformat() if next_review else None,
             }
             update_mistake(mistake_id, data)
             st.success("错题已更新！")

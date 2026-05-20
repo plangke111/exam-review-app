@@ -103,6 +103,9 @@ def create_mistake(data: dict) -> int:
     values.setdefault("difficulty", "中等")
     values.setdefault("is_favorite", 0)
     values.setdefault("is_mastered", 0)
+    # 下次复习日期默认今天，确保新错题立即进入复习池
+    if not values.get("next_review_date"):
+        values["next_review_date"] = date.today().isoformat()
     # 确保 chapter_id 为整数或 NULL
     if values["chapter_id"] == "" or values["chapter_id"] is None:
         values["chapter_id"] = None
