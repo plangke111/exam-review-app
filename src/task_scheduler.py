@@ -59,13 +59,22 @@ def generate_daily_tasks(task_date=None):
     for subj in subjects:
         subj_id = subj["id"]
 
-        # 检查当天是否已有该科目任务
-        existing = conn.execute(
-            "SELECT COUNT(*) as cnt FROM daily_tasks WHERE task_date = ? AND subject_id = ?",
+        # 检查当天是否已有该科目的 pending/postponed 任务
+        # 若存在则不重复生成；若仅有 done 任务，则计算剩余槽位
+        pending_count = conn.execute(
+            "SELECT COUNT(*) as cnt FROM daily_tasks WHERE task_date = ? AND subject_id = ? AND status IN ('pending', 'postponed')",
             (task_date, subj_id),
-        ).fetchone()
-        if existing["cnt"] > 0:
-            # 该科目今日已有任务，跳过生成
+        ).fetchone()["cnt"]
+        if pending_count > 0:
+            continue
+
+        # 已完成的题数，用于计算剩余槽位
+        done_count = conn.execute(
+            "SELECT COUNT(*) as cnt FROM daily_tasks WHERE task_date = ? AND subject_id = ? AND status = 'done'",
+            (task_date, subj_id),
+        ).fetchone()["cnt"]
+        remaining_slots = max(0, 5 - done_count)
+        if remaining_slots == 0:
             continue
 
         selected_ids = set()
@@ -123,8 +132,8 @@ def generate_daily_tasks(task_date=None):
                 candidates_all.append((row["id"], row["chapter_id"], 4))
                 selected_ids.add(row["id"])
 
-        # 章节分散选取
-        chosen_ids = select_balanced_by_chapter(candidates_all, limit=5)
+        # 章节分散选取（按剩余槽位）
+        chosen_ids = select_balanced_by_chapter(candidates_all, limit=remaining_slots)
 
         # 写入 daily_tasks
         for m_id in chosen_ids:

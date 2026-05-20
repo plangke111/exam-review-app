@@ -101,6 +101,17 @@ def init_db():
         );
     """)
 
+    # 数据库迁移：添加 review_stage 列（艾宾浩斯复习阶段）
+    try:
+        cursor.execute("ALTER TABLE mistakes ADD COLUMN review_stage INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # 列已存在
+
+    # 为已有复习记录的错题初始化 review_stage（用 review_count 作为初始阶段，上限 6）
+    cursor.execute(
+        "UPDATE mistakes SET review_stage = MIN(review_count, 6) WHERE review_stage = 0 AND review_count > 0"
+    )
+
     # 插入默认科目（如已存在则忽略）
     default_subjects = [
         ("高等数学", "数学课", 1),

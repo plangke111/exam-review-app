@@ -8,7 +8,7 @@ from datetime import date
 from src.db import init_db
 from src.services import (
     get_today_tasks, mark_task_done, mark_task_wrong, postpone_task,
-    toggle_favorite, toggle_mastered, get_task_by_id, create_review_record,
+    toggle_favorite, toggle_mastered, get_task_by_id,
 )
 from src.utils import difficulty_color, get_today_str
 
@@ -81,23 +81,19 @@ def _render_task_card(task):
             if task["status"] != "done":
                 if st.button("✅ 标记完成", key=f"done_{task['id']}", use_container_width=True):
                     mark_task_done(task["id"])
-                    create_review_record(task["mistake_id"], get_today_str(), is_completed=1, is_correct=1)
                     st.rerun()
 
                 if st.button("❌ 仍然错误", key=f"wrong_{task['id']}", use_container_width=True):
                     mark_task_wrong(task["id"])
-                    create_review_record(task["mistake_id"], get_today_str(), is_completed=1, is_correct=0)
                     st.rerun()
 
                 if st.button("⏳ 标记未完成", key=f"postpone_{task['id']}", use_container_width=True):
                     postpone_task(task["id"])
-                    create_review_record(task["mistake_id"], get_today_str(), is_completed=0, is_correct=1)
                     st.rerun()
 
                 if st.button("🎯 已经掌握", key=f"master_{task['id']}", use_container_width=True):
-                    mark_task_done(task["id"])
+                    mark_task_done(task["id"], marked_mastered=1)
                     toggle_mastered(task["mistake_id"])
-                    create_review_record(task["mistake_id"], get_today_str(), is_completed=1, is_correct=1, marked_mastered=1)
                     st.rerun()
 
             st.markdown("---")

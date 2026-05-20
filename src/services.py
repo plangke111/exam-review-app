@@ -4,6 +4,7 @@
 
 from datetime import date
 from src.db import get_connection
+from src.utils import get_ebbinghaus_interval
 
 
 # ==================== 科目 ====================
@@ -284,8 +285,9 @@ def get_today_tasks():
     return get_tasks_by_date(today)
 
 
-def update_task_status(task_id, status, is_correct=None):
-    """更新任务状态。"""
+def update_task_status(task_id, status, is_correct=None, marked_mastered=0):
+    """更新任务状态，同时自动创建复习记录并更新错题统计。"""
+    from datetime import date, timedelta
     conn = get_connection()
     if is_correct is not None:
         conn.execute(
@@ -303,38 +305,53 @@ def update_task_status(task_id, status, is_correct=None):
         conn.execute("UPDATE daily_tasks SET status = ? WHERE id = ?", (status, task_id))
     conn.commit()
 
-    # 获取任务信息用于更新错题统计
+    # 获取任务信息用于更新错题统计和创建复习记录
     task = conn.execute(
         "SELECT mistake_id, subject_id FROM daily_tasks WHERE id = ?", (task_id,)
     ).fetchone()
     if task:
+        today = date.today().isoformat()
+        is_completed = 1 if status == 'done' else 0
+        review_correct = is_correct if is_correct is not None else 1
+
+        # 自动创建复习记录
         conn.execute(
-            "UPDATE mistakes SET review_count = review_count + 1, last_review_date = date('now'), updated_at = datetime('now','localtime') WHERE id = ?",
-            (task["mistake_id"],),
+            """INSERT INTO review_records (mistake_id, review_date, is_completed, is_correct, marked_mastered, note)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (task["mistake_id"], today, is_completed, review_correct, marked_mastered, ""),
         )
-        if is_correct == 0:
+
+        # 更新错题统计（仅实际完成时更新，延期不更新）
+        if status == 'done':
             conn.execute(
-                "UPDATE mistakes SET wrong_count = wrong_count + 1, updated_at = datetime('now','localtime') WHERE id = ?",
+                "UPDATE mistakes SET review_count = review_count + 1, last_review_date = date('now'), updated_at = datetime('now','localtime') WHERE id = ?",
                 (task["mistake_id"],),
             )
-            # 错误后设置 3 天后再次复习
-            conn.execute(
-                "UPDATE mistakes SET next_review_date = date('now', '+3 days') WHERE id = ?",
-                (task["mistake_id"],),
-            )
-        elif status == 'done':
-            # 完成的题设置 7 天后再次复习
-            conn.execute(
-                "UPDATE mistakes SET next_review_date = date('now', '+7 days') WHERE id = ?",
-                (task["mistake_id"],),
-            )
+            if is_correct == 0:
+                # 答错：错误计数+1，重置复习阶段，1天后重试
+                conn.execute(
+                    "UPDATE mistakes SET wrong_count = wrong_count + 1, review_stage = 0, next_review_date = date('now', '+1 days'), updated_at = datetime('now','localtime') WHERE id = ?",
+                    (task["mistake_id"],),
+                )
+            else:
+                # 答对：复习阶段+1，按艾宾浩斯曲线设置下次复习日期
+                old_stage = conn.execute(
+                    "SELECT review_stage FROM mistakes WHERE id = ?", (task["mistake_id"],)
+                ).fetchone()["review_stage"]
+                new_stage = (old_stage or 0) + 1
+                interval = get_ebbinghaus_interval(new_stage)
+                next_date = (date.today() + timedelta(days=interval)).isoformat()
+                conn.execute(
+                    "UPDATE mistakes SET review_stage = ?, next_review_date = ?, updated_at = datetime('now','localtime') WHERE id = ?",
+                    (new_stage, next_date, task["mistake_id"]),
+                )
         conn.commit()
     conn.close()
 
 
-def mark_task_done(task_id):
+def mark_task_done(task_id, marked_mastered=0):
     """标记任务为已完成。"""
-    update_task_status(task_id, 'done', is_correct=1)
+    update_task_status(task_id, 'done', is_correct=1, marked_mastered=marked_mastered)
 
 
 def mark_task_wrong(task_id):
