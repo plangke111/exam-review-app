@@ -1,5 +1,7 @@
 """工具函数模块。"""
 
+import os
+import uuid
 from datetime import date, timedelta
 
 # 艾宾浩斯遗忘曲线复习间隔（天数）
@@ -17,6 +19,38 @@ def get_ebbinghaus_interval(review_stage):
         review_stage = 0
     idx = min(review_stage, len(EBBINGHAUS_INTERVALS) - 1)
     return EBBINGHAUS_INTERVALS[idx]
+
+
+def save_uploaded_image(uploaded_file, base_dir) -> str:
+    """
+    保存上传的图片到 data/images/ 目录。
+    返回相对于 data/ 的路径字符串（如 images/abc.png），失败返回空字符串。
+    """
+    if uploaded_file is None:
+        return ""
+    try:
+        from PIL import Image
+        img = Image.open(uploaded_file)
+        # 统一转为 PNG
+        ext = ".png"
+        filename = f"{uuid.uuid4().hex}{ext}"
+        img_dir = os.path.join(base_dir, "images")
+        os.makedirs(img_dir, exist_ok=True)
+        filepath = os.path.join(img_dir, filename)
+        img.save(filepath, "PNG")
+        return f"images/{filename}"
+    except ImportError:
+        # 没有 PIL，直接保存原始文件
+        ext = os.path.splitext(uploaded_file.name)[1] or ".png"
+        filename = f"{uuid.uuid4().hex}{ext}"
+        img_dir = os.path.join(base_dir, "images")
+        os.makedirs(img_dir, exist_ok=True)
+        filepath = os.path.join(img_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        return f"images/{filename}"
+    except Exception:
+        return ""
 
 
 def format_date(d):

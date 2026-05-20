@@ -2,6 +2,7 @@
 业务逻辑服务层，封装所有数据库 CRUD 操作。
 """
 
+import os
 from datetime import date
 from src.db import get_connection
 from src.utils import get_ebbinghaus_interval
@@ -97,7 +98,7 @@ def create_mistake(data: dict) -> int:
     fields = [
         "subject_id", "chapter_id", "title", "content", "wrong_reason",
         "solution", "knowledge_points", "source", "difficulty",
-        "is_favorite", "is_mastered", "note", "next_review_date",
+        "is_favorite", "is_mastered", "note", "next_review_date", "image_path",
     ]
     values = {k: data.get(k, "") for k in fields}
     values.setdefault("difficulty", "中等")
@@ -128,7 +129,7 @@ def update_mistake(mistake_id, data: dict):
     allowed = [
         "subject_id", "chapter_id", "title", "content", "wrong_reason",
         "solution", "knowledge_points", "source", "difficulty",
-        "is_favorite", "is_mastered", "note", "next_review_date",
+        "is_favorite", "is_mastered", "note", "next_review_date", "image_path",
     ]
     updates = {k: v for k, v in data.items() if k in allowed}
     if not updates:
@@ -149,8 +150,15 @@ def update_mistake(mistake_id, data: dict):
 
 
 def delete_mistake(mistake_id):
-    """删除错题及其关联的任务和复习记录。"""
+    """删除错题及其关联的任务、复习记录和图片。"""
     conn = get_connection()
+    row = conn.execute("SELECT image_path FROM mistakes WHERE id = ?", (mistake_id,)).fetchone()
+    if row and row["image_path"]:
+        img = row["image_path"]
+        abs_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", img)
+        if os.path.exists(abs_path):
+            os.remove(abs_path)
+
     conn.execute("DELETE FROM daily_tasks WHERE mistake_id = ?", (mistake_id,))
     conn.execute("DELETE FROM review_records WHERE mistake_id = ?", (mistake_id,))
     conn.execute("DELETE FROM mistakes WHERE id = ?", (mistake_id,))
@@ -268,7 +276,7 @@ def get_tasks_by_date(task_date):
     rows = conn.execute(
         """SELECT dt.*, m.title, m.difficulty, m.is_favorite, m.is_mastered,
                   m.content, m.solution, m.wrong_reason, m.knowledge_points,
-                  m.chapter_id,
+                  m.chapter_id, m.image_path,
                   s.name as subject_name, c.name as chapter_name
            FROM daily_tasks dt
            JOIN mistakes m ON dt.mistake_id = m.id

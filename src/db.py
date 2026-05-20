@@ -22,6 +22,7 @@ def _get_base_dir():
 BASE_DIR = _get_base_dir()
 DB_DIR = os.path.join(BASE_DIR, "data")
 DB_PATH = os.path.join(DB_DIR, "review.db")
+IMAGE_DIR = os.path.join(DB_DIR, "images")
 
 
 def get_connection():
@@ -111,6 +112,12 @@ def init_db():
     cursor.execute(
         "UPDATE mistakes SET review_stage = MIN(review_count, 6) WHERE review_stage = 0 AND review_count > 0"
     )
+
+    # 数据库迁移：添加 image_path 列（错题图片）
+    try:
+        cursor.execute("ALTER TABLE mistakes ADD COLUMN image_path TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # 列已存在
 
     # 插入默认科目（如已存在则忽略）
     default_subjects = [

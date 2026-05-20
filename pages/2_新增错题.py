@@ -1,19 +1,21 @@
 """
-新增错题页面 — 支持录入单道错题和批量历史错题导入。
+新增错题页面 — 支持录入单道错题和批量历史错题导入，支持上传题目图片。
 """
 
+import os
 import streamlit as st
 from datetime import date
 
-from src.db import init_db
+from src.db import init_db, DB_DIR
 from src.services import (
     get_all_subjects, get_chapters_by_subject, create_mistake, update_mistake,
     get_mistake_by_id, query_mistakes,
 )
+from src.utils import save_uploaded_image
 
 init_db()
 
-SOURCES = ["真题", "模拟题", "习题册", "课堂", "自己整理"]
+SOURCES = ["真题", "模拟题", "习题册", "课后习题", "教材例题", "思考题", "课堂", "自己整理"]
 DIFFICULTIES = ["简单", "中等", "困难"]
 
 
@@ -75,16 +77,23 @@ def _single_entry_form():
 
     note = st.text_area("备注", height=60, key="s_note")
 
-    col_fav, col_mas = st.columns(2)
+    col_fav, col_mas, col_img = st.columns(3)
     with col_fav:
         is_fav = st.checkbox("收藏此题", key="s_fav")
     with col_mas:
         is_mas = st.checkbox("已熟练掌握", key="s_mas")
+    with col_img:
+        uploaded = st.file_uploader("📷 题目图片（可选）", type=["png", "jpg", "jpeg", "gif", "bmp"], key="s_img")
+
+    if uploaded:
+        st.caption(f"已选择：{uploaded.name}")
 
     if st.button("💾 保存错题", type="primary", use_container_width=True):
         if not title.strip():
             st.error("题目标题不能为空！")
             return
+        # 先保存图片
+        image_path = save_uploaded_image(uploaded, DB_DIR) if uploaded else ""
         data = {
             "subject_id": subj_id,
             "chapter_id": chapter_id,
@@ -99,6 +108,7 @@ def _single_entry_form():
             "is_mastered": 1 if is_mas else 0,
             "note": note.strip(),
             "next_review_date": date.today().isoformat(),
+            "image_path": image_path,
         }
         mid = create_mistake(data)
         st.success(f"错题已保存！ID: {mid}")
@@ -264,7 +274,7 @@ def _show_edit_form(mistake_id):
         diff_idx = diff_opts.index(m["difficulty"]) if m["difficulty"] in diff_opts else 1
         difficulty = st.selectbox("难度", diff_opts, index=diff_idx, key="edit_diff")
     with col2:
-        src_opts = ["真题", "模拟题", "习题册", "课堂", "自己整理"]
+        src_opts = SOURCES
         src_idx = src_opts.index(m["source"]) if m["source"] in src_opts else 0
         source = st.selectbox("来源", src_opts, index=src_idx, key="edit_src")
     with col3:
@@ -287,6 +297,17 @@ def _show_edit_form(mistake_id):
 
     note = st.text_area("备注", value=m["note"] or "", height=60, key="edit_note")
 
+    # 当前图片展示
+    if m["image_path"]:
+        img_full = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", m["image_path"])
+        if os.path.exists(img_full):
+            st.caption("📷 当前图片：")
+            st.image(img_full, width=400)
+
+    edit_uploaded = st.file_uploader("📷 替换图片（可选，留空则保留原图）", type=["png", "jpg", "jpeg", "gif", "bmp"], key="edit_img")
+    if edit_uploaded:
+        st.caption(f"新图片：{edit_uploaded.name}")
+
     col_save, col_del = st.columns([3, 1])
     with col_save:
         if st.button("💾 保存修改", type="primary", use_container_width=True):
@@ -298,6 +319,16 @@ def _show_edit_form(mistake_id):
                 "difficulty": difficulty, "is_favorite": 1 if is_fav else 0,
                 "is_mastered": 1 if is_mas else 0, "note": note.strip(),
             }
+            # 上传了新图片则替换
+            if edit_uploaded:
+                new_path = save_uploaded_image(edit_uploaded, DB_DIR)
+                if new_path:
+                    # 删除旧图片
+                    if m["image_path"]:
+                        old_img = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", m["image_path"])
+                        if os.path.exists(old_img):
+                            os.remove(old_img)
+                    data["image_path"] = new_path
             update_mistake(mistake_id, data)
             st.success("错题已更新！")
             st.rerun()

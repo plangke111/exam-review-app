@@ -4,6 +4,7 @@
 
 import streamlit as st
 from datetime import date
+import os
 
 from src.db import init_db
 from src.services import (
@@ -61,6 +62,9 @@ def _render_task_card(task):
             st.markdown(f"**难度：** {task['difficulty']}")
 
             st.markdown("---")
+            # 显示题目图片
+            if task.get("image_path"):
+                _show_mistake_image(task["image_path"])
             st.markdown("**📄 题目内容**")
             st.text(task["content"] or "（无）")
 
@@ -109,6 +113,16 @@ def _render_task_card(task):
             if st.button(m_label, key=f"tog_master_{task['id']}", use_container_width=True):
                 toggle_mastered(task["mistake_id"])
                 st.rerun()
+
+
+def _show_mistake_image(image_path):
+    """显示错题图片。"""
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    full_path = os.path.join(base, "data", image_path)
+    if os.path.exists(full_path):
+        st.image(full_path, width=400)
+    else:
+        st.caption("（图片已丢失）")
 
 
 if __name__ == "__main__":

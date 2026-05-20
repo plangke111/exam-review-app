@@ -3,6 +3,7 @@
 """
 
 import streamlit as st
+import os
 
 from src.db import init_db
 from src.services import (
@@ -93,6 +94,8 @@ def _render_mistake_card(m):
                 st.caption(f"最近复习：{m['last_review_date']}  |  下次计划：{m['next_review_date'] or '未设定'}")
 
             st.markdown("---")
+            if m.get("image_path"):
+                _show_mistake_image(m["image_path"])
             st.markdown("**📄 题目内容**")
             st.text(m["content"] or "（无）")
             st.markdown("**❌ 错误原因**")
@@ -148,6 +151,16 @@ def _render_mistake_card(m):
                     if st.button("取消", key=f"qb_dn_{m['id']}", use_container_width=True):
                         st.session_state[f"qb_confirm_{m['id']}"] = False
                         st.rerun()
+
+
+def _show_mistake_image(image_path):
+    """显示错题图片。"""
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    full_path = os.path.join(base, "data", image_path)
+    if os.path.exists(full_path):
+        st.image(full_path, width=400)
+    else:
+        st.caption("（图片已丢失）")
 
 
 if __name__ == "__main__":
