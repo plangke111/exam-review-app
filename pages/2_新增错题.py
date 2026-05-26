@@ -148,7 +148,7 @@ def _quick_entry_form():
 
     # 题型配置：类型 → (标题, 容量, 来源, 前缀)
     question_types = [
-        ("例题", 30, "教材例题", f"例题{chapter_num}."),
+        ("例题", 40, "教材例题", f"例题{chapter_num}."),
         ("习题", 30, "课后习题", f"习题{chapter_num}."),
         ("练习册", 40, "习题册",   f"练习册{chapter_num}."),
     ]
@@ -216,9 +216,12 @@ def _quick_entry_form():
 def _get_existing_quick_numbers(subject_id, chapter_id):
     """获取已有快捷录入的题号集合，用于标记已录入。"""
     rows = get_mistakes_by_filter(subject_id=subject_id, chapter_id=chapter_id)
-    return {r.get("title", "") for r in rows if r.get("title", "").startswith(
-        ("例题", "习题", "练习册")
-    )}
+    result = set()
+    for r in rows:
+        title = r["title"] if r["title"] else ""
+        if title.startswith(("例题", "习题", "练习册")):
+            result.add(title)
+    return result
 
 
 def _batch_entry_form():
