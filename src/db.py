@@ -102,6 +102,42 @@ def init_db():
         );
     """)
 
+    # ==== 健身相关表 ====
+    cursor.executescript("""
+        CREATE TABLE IF NOT EXISTS exercises (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            name         TEXT    NOT NULL,
+            muscle_group TEXT    NOT NULL,
+            equipment    TEXT    DEFAULT '',
+            default_sets INTEGER DEFAULT 3,
+            default_reps TEXT    DEFAULT '12',
+            day_type     TEXT    NOT NULL,
+            description  TEXT    DEFAULT '',
+            sort_order   INTEGER DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS workout_records (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_date     TEXT    NOT NULL,
+            exercise_id     INTEGER NOT NULL REFERENCES exercises(id),
+            completed_sets  INTEGER DEFAULT 0,
+            completed_reps  TEXT    DEFAULT '',
+            is_done         INTEGER DEFAULT 0,
+            note            TEXT    DEFAULT '',
+            created_at      TEXT    DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS fitness_settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+    """)
+
+    # 预置动作库（如已存在则忽略）
+    _init_exercises(cursor)
+    # 初始化健身设置（如已存在则忽略）
+    _init_fitness_settings(cursor)
+
     # 数据库迁移：添加 review_stage 列（艾宾浩斯复习阶段）
     try:
         cursor.execute("ALTER TABLE mistakes ADD COLUMN review_stage INTEGER DEFAULT 0")
@@ -222,6 +258,54 @@ def _init_default_chapters(cursor):
                 "INSERT OR IGNORE INTO chapters (subject_id, name) VALUES (?, ?)",
                 (sid, ch_name),
             )
+
+
+def _init_exercises(cursor):
+    """预置健身动作库（宿舍可用器械：弹力绳、哑铃、引体向上杆）。"""
+    exercises = [
+        # Pull Day (拉力日)
+        ("引体向上",          "背部",   "引体向上杆", 3, "8-12", "pull",  "正手宽握，下巴过杠", 1),
+        ("哑铃划船",          "背部",   "哑铃",      3, "10-12","pull",  "单臂支撑，感受背部收缩", 2),
+        ("弹力绳划船",        "背部",   "弹力绳",    3, "12-15","pull",  "坐姿，弹力绳固定于脚底", 3),
+        ("弹力绳面拉",        "肩部",   "弹力绳",    3, "12-15","pull",  "拉动至面部，肩胛后缩", 4),
+        ("哑铃二头弯举",      "手臂",   "哑铃",      3, "10-12","pull",  "肘部固定，慢放快起", 5),
+
+        # Push Day (推力日)
+        ("哑铃卧推",          "胸部",   "哑铃",      3, "8-12", "push",  "仰卧地面或床上，肘部45°", 1),
+        ("哑铃推举",          "肩部",   "哑铃",      3, "8-12", "push",  "坐姿，哑铃从肩推到头顶", 2),
+        ("哑铃侧平举",        "肩部",   "哑铃",      3, "10-15","push",  "轻重量，感受三角肌中束", 3),
+        ("弹力绳推举",        "肩部",   "弹力绳",    3, "12-15","push",  "站姿，弹力绳踩在脚下", 4),
+        ("哑铃三头臂屈伸",    "手臂",   "哑铃",      3, "10-12","push",  "单手颈后，控制下落", 5),
+        ("俯卧撑",            "胸部",   "自重",      3, "10-15","push",  "宽距/窄距/下斜", 6),
+
+        # Leg Day (腿部日)
+        ("哑铃深蹲",          "腿部",   "哑铃",      3, "10-15","legs",  "哑铃持于胸前，腰背挺直", 1),
+        ("保加利亚分腿蹲",    "腿部",   "哑铃",      3, "8-12", "legs",  "后脚搭在椅子/床上", 2),
+        ("哑铃硬拉",          "臀部",   "哑铃",      3, "10-12","legs",  "哑铃放于脚两侧，直背拉起", 3),
+        ("弹力绳侧步走",      "臀部",   "弹力绳",    3, "10-12","legs",  "弹力绳套脚踝，侧向移动", 4),
+        ("自重深蹲",          "腿部",   "自重",      3, "12-20","legs",  "可升级为手枪深蹲辅助", 5),
+
+        # Core (核心)
+        ("平板支撑",          "核心",   "自重",      3, "30s",  "core",  "肘部撑地，身体一条直线", 1),
+        ("卷腹",              "核心",   "自重",      3, "15-20","core",  "肩胛离开地面即可", 2),
+        ("悬垂举腿",          "核心",   "引体向上杆",3, "8-12", "core",  "悬挂于引体杆，抬腿至水平", 3),
+        ("俄罗斯转体",        "核心",   "哑铃",      3, "10-15","core",  "坐姿，转体带动哑铃", 4),
+    ]
+    cursor.executemany(
+        """INSERT OR IGNORE INTO exercises
+           (name, muscle_group, equipment, default_sets, default_reps, day_type, description, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        exercises,
+    )
+
+
+def _init_fitness_settings(cursor):
+    """初始化健身设置（开始日期等）。"""
+    today = __import__("datetime").date.today().isoformat()
+    cursor.execute(
+        "INSERT OR IGNORE INTO fitness_settings (key, value) VALUES (?, ?)",
+        ("start_date", today),
+    )
 
 
 if __name__ == "__main__":

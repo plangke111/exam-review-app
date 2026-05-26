@@ -10,6 +10,7 @@ from src.statistics import get_total_statistics, get_subject_statistics
 from src.task_scheduler import generate_daily_tasks, regenerate_daily_tasks
 from src.services import task_exists_for_date
 from src.utils import get_today_str
+from src.fitness_service import get_todays_workout, get_workout_stats as get_fitness_stats
 
 st.set_page_config(
     page_title="考研错题复习提醒系统",
@@ -29,7 +30,7 @@ def main():
 
     # ===== 侧边栏操作按钮 =====
     with st.sidebar:
-        st.subheader("⚡ 快捷操作")
+        st.subheader("📚 复习操作")
         col_a, col_b = st.columns(2)
         with col_a:
             if st.button("🔄 生成今日任务", use_container_width=True):
@@ -51,6 +52,14 @@ def main():
                 st.success(f"已重新生成 {total} 道今日复习题（已完成的任务已保留）")
                 st.rerun()
 
+        st.divider()
+        st.subheader("🏋️ 健身")
+        today_workout = get_todays_workout()
+        fstats = get_fitness_stats()
+        st.caption(f"第 {fstats['week_no']} 周 | {today_workout['day_type_name']}")
+        st.caption(f"本周训练 {fstats['this_week_workouts']}/{fstats['this_week_target']} 天")
+        if st.button("💪 去训练", use_container_width=True):
+            st.switch_page("pages/8_健身计划.py")
         st.divider()
         st.caption("页面导航请使用左侧菜单")
 
@@ -91,7 +100,7 @@ def main():
 
     # ===== 快捷操作卡片 =====
     st.subheader("📌 常用入口")
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 1])
     with c1:
         with st.container(border=True):
             st.markdown("#### 📝 今日复习")
@@ -116,6 +125,14 @@ def main():
             st.write(f"待复习：**{stats['need_review']}** 题")
             st.write(f"延期题：**{stats['postponed']}** 题")
             st.page_link("pages/6_数据统计.py", label="查看详细统计 →")
+    with c5:
+        fstats = get_fitness_stats()
+        today_workout = get_todays_workout()
+        with st.container(border=True):
+            st.markdown("#### 🏋️ 健身")
+            st.write(f"第 {fstats['week_no']} 周")
+            st.write(f"{today_workout['day_type_name']}")
+            st.page_link("pages/8_健身计划.py", label="开始训练 →")
 
 
 if __name__ == "__main__":
