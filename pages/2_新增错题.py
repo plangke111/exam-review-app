@@ -11,7 +11,8 @@ from src.services import (
     get_all_subjects, get_chapters_by_subject, create_mistake, update_mistake,
     get_mistake_by_id, query_mistakes,
 )
-from src.utils import save_uploaded_image
+from src.statistics import get_mistakes_by_filter
+from src.utils import save_uploaded_image, extract_chapter_number, generate_quick_title
 
 init_db()
 
@@ -22,15 +23,18 @@ DIFFICULTIES = ["简单", "中等", "困难"]
 def main():
     st.title("➕ 新增错题")
 
-    tab1, tab2, tab3 = st.tabs(["📝 逐题录入", "📋 批量历史录入", "✏️ 编辑错题"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📝 逐题录入", "⚡ 快捷录入", "📋 批量历史录入", "✏️ 编辑错题"])
 
     with tab1:
         _single_entry_form()
 
     with tab2:
-        _batch_entry_form()
+        _quick_entry_form()
 
     with tab3:
+        _batch_entry_form()
+
+    with tab4:
         _edit_form()
 
 
@@ -113,6 +117,108 @@ def _single_entry_form():
         mid = create_mistake(data)
         st.success(f"错题已保存！ID: {mid}")
         st.balloons()
+
+
+def _quick_entry_form():
+    """快捷录入面板：只选题号，不写题目内容，用户翻书复习。"""
+    st.subheader("⚡ 快捷录入")
+    st.caption("直接输入题号即可记录错题，无需填写题目内容。用户翻书查阅原题。")
+
+    subjects = get_all_subjects()
+    subj_opts = {s["name"]: s["id"] for s in subjects}
+
+    col_s, col_c = st.columns(2)
+    with col_s:
+        subj_name = st.selectbox("科目", list(subj_opts.keys()), key="q_subj")
+        subj_id = subj_opts[subj_name]
+    with col_c:
+        chapters = get_chapters_by_subject(subj_id)
+        if not chapters:
+            st.info("该科目暂无章节，请先到「章节管理」创建章节。")
+            return
+        ch_opts = {c["name"]: c["id"] for c in chapters}
+        ch_name = st.selectbox("章节", list(ch_opts.keys()), key="q_ch")
+        chapter_id = ch_opts[ch_name]
+        selected_chapter = next((c for c in chapters if c["id"] == chapter_id), None)
+        chapter_num = extract_chapter_number(selected_chapter["name"] if selected_chapter else "")
+
+    if chapter_num is None:
+        # 解析不到编号时用数据库 id 替代
+        chapter_num = chapter_id or 0
+
+    # 题型配置：类型 → (标题, 容量, 来源, 前缀)
+    question_types = [
+        ("例题", 30, "教材例题", f"例题{chapter_num}."),
+        ("习题", 30, "课后习题", f"习题{chapter_num}."),
+        ("练习册", 40, "习题册",   f"练习册{chapter_num}."),
+    ]
+
+    # 已存在的错题编号（用于标记已录入）
+    existing = _get_existing_quick_numbers(subj_id, chapter_id)
+
+    with st.form("quick_form", clear_on_submit=False):
+
+        for qtype, capacity, source_name, prefix in question_types:
+            st.markdown(f"**📌 {qtype}（共 {capacity} 题）**")
+            cols = st.columns(5)
+            for i in range(1, capacity + 1):
+                key = f"qc_{qtype}_{i}"
+                already = f"{prefix}{i}" in existing
+                with cols[(i - 1) % 5]:
+                    checked = st.checkbox(
+                        f"{prefix}{i}",
+                        key=key,
+                        # 灰色标记已录入的题目
+                        disabled=already,
+                    )
+                    if already and i == 1:
+                        st.caption("（已录入）")
+
+        st.divider()
+        submitted = st.form_submit_button("💾 保存选中的错题", type="primary", use_container_width=True)
+
+    if submitted:
+        count = 0
+        for qtype, capacity, source_name, prefix in question_types:
+            for i in range(1, capacity + 1):
+                key = f"qc_{qtype}_{i}"
+                if st.session_state.get(key, False):
+                    title = generate_quick_title(qtype, chapter_num, i)
+                    # 跳过已存在的
+                    if title in existing:
+                        continue
+                    data = {
+                        "subject_id": subj_id,
+                        "chapter_id": chapter_id,
+                        "title": title,
+                        "content": "",
+                        "wrong_reason": "",
+                        "solution": "",
+                        "knowledge_points": "",
+                        "source": source_name,
+                        "difficulty": "中等",
+                        "is_favorite": 0,
+                        "is_mastered": 0,
+                        "note": "",
+                        "next_review_date": date.today().isoformat(),
+                        "question_type": qtype,
+                        "question_number": i,
+                    }
+                    create_mistake(data)
+                    count += 1
+        if count > 0:
+            st.success(f"成功录入 {count} 道错题！")
+        else:
+            st.info("未选中任何新错题。")
+        st.rerun()
+
+
+def _get_existing_quick_numbers(subject_id, chapter_id):
+    """获取已有快捷录入的题号集合，用于标记已录入。"""
+    rows = get_mistakes_by_filter(subject_id=subject_id, chapter_id=chapter_id)
+    return {r.get("title", "") for r in rows if r.get("title", "").startswith(
+        ("例题", "习题", "练习册")
+    )}
 
 
 def _batch_entry_form():

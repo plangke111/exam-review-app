@@ -1,6 +1,7 @@
 """工具函数模块。"""
 
 import os
+import re
 import uuid
 from datetime import date, timedelta
 
@@ -19,6 +20,28 @@ def get_ebbinghaus_interval(review_stage):
         review_stage = 0
     idx = min(review_stage, len(EBBINGHAUS_INTERVALS) - 1)
     return EBBINGHAUS_INTERVALS[idx]
+
+
+def extract_chapter_number(chapter_name):
+    """
+    从章节名中提取数字编号。
+    '第1讲 函数极限与连续' → 1
+    '第一章 数字逻辑概论' → 1
+    '补充章节' → None（无法解析时用章节 id）
+    """
+    m = re.search(r"第(\d+)", str(chapter_name))
+    return int(m.group(1)) if m else None
+
+
+def generate_quick_title(question_type, chapter_num, question_number):
+    """
+    生成快捷录入的题目标题。
+    question_type: '例题' / '习题' / '练习册'
+    chapter_num: 章节编号（如 1, 2）
+    question_number: 题号（如 1, 2）
+    返回: '例题1.1'
+    """
+    return f"{question_type}{chapter_num}.{question_number}"
 
 
 def save_uploaded_image(uploaded_file, base_dir) -> str:

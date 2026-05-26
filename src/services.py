@@ -99,6 +99,7 @@ def create_mistake(data: dict) -> int:
         "subject_id", "chapter_id", "title", "content", "wrong_reason",
         "solution", "knowledge_points", "source", "difficulty",
         "is_favorite", "is_mastered", "note", "next_review_date", "image_path",
+        "question_type", "question_number",
     ]
     values = {k: data.get(k, "") for k in fields}
     values.setdefault("difficulty", "中等")
@@ -110,6 +111,12 @@ def create_mistake(data: dict) -> int:
     # 确保 chapter_id 为整数或 NULL
     if values["chapter_id"] == "" or values["chapter_id"] is None:
         values["chapter_id"] = None
+    # 确保 question_number 为整数或 NULL
+    qn = values.get("question_number")
+    if qn is None or qn == "":
+        values["question_number"] = None
+    else:
+        values["question_number"] = int(qn)
 
     columns = ", ".join(values.keys())
     placeholders = ", ".join(["?" for _ in values])
@@ -130,6 +137,7 @@ def update_mistake(mistake_id, data: dict):
         "subject_id", "chapter_id", "title", "content", "wrong_reason",
         "solution", "knowledge_points", "source", "difficulty",
         "is_favorite", "is_mastered", "note", "next_review_date", "image_path",
+        "question_type", "question_number",
     ]
     updates = {k: v for k, v in data.items() if k in allowed}
     if not updates:

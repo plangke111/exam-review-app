@@ -119,6 +119,16 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # 列已存在
 
+    # 数据库迁移：添加 question_type / question_number 列（快捷录入）
+    try:
+        cursor.execute("ALTER TABLE mistakes ADD COLUMN question_type TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE mistakes ADD COLUMN question_number INTEGER")
+    except sqlite3.OperationalError:
+        pass
+
     # 插入默认科目（如已存在则忽略）
     default_subjects = [
         ("高等数学", "数学课", 1),
