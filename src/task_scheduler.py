@@ -12,47 +12,56 @@ from src.services import get_pending_tasks_before_date
 
 def select_balanced_by_chapter(candidates, limit=5):
     """
-    从候选错题列表中完全随机选出 limit 道题，章节、题号、题型均匀分散。
+    从候选错题列表中选出 limit 道题。
+    优先保证章节分散（同一天尽量不重复选同一章），章节内题型/题号随机。
 
     candidates: [(mistake_id, chapter_id, priority_layer, ...), ...]
     返回: [mistake_id, ...]
-
-    算法：
-      1. 按 question_type 分组（保证各类型均匀出现）
-      2. 组内各自打乱
-      3. 跨类型轮询 + 每轮随机顺序，每次选到的章节、题型、题号都不可预测
     """
     if not candidates:
         return []
 
-    # 按 question_type 分组，确保每种题型都有机会被选中
-    type_groups = defaultdict(list)
+    # 按章节分组
+    chapter_groups = defaultdict(list)
     for item in candidates:
-        qtype = item[4] if len(item) > 4 else "__none__"
-        type_groups[qtype].append(item)
+        ch_id = item[1] if item[1] is not None else 0
+        chapter_groups[ch_id].append(item)
 
-    # 各组内打乱
-    type_keys = list(type_groups.keys())
-    for k in type_keys:
-        random.shuffle(type_groups[k])
+    # 各章节内随机打乱（保证题型、题号随机）
+    for ch_id in chapter_groups:
+        random.shuffle(chapter_groups[ch_id])
 
-    # 每次轮询随机打乱类型顺序，跨类型均匀选取
     selected = []
-    indices = {k: 0 for k in type_keys}
-    round_robin_keys = type_keys[:]
+    selected_ids = set()
+    chapter_queue = list(chapter_groups.keys())
+    chapter_pos = {ch: 0 for ch in chapter_queue}
+    used_chapters = set()
 
     while len(selected) < limit:
-        added = False
-        random.shuffle(round_robin_keys)
-        for k in round_robin_keys:
-            if indices[k] < len(type_groups[k]):
-                selected.append(type_groups[k][indices[k]][0])
-                indices[k] += 1
-                added = True
-                if len(selected) >= limit:
-                    break
-        if not added:
+        # 还有候选题的章节
+        available = [
+            ch for ch in chapter_queue
+            if chapter_pos[ch] < len(chapter_groups[ch])
+        ]
+        if not available:
             break
+
+        # 优先选本轮还没用过的章节
+        fresh = [ch for ch in available if ch not in used_chapters]
+        if fresh:
+            ch = random.choice(fresh)
+        else:
+            ch = random.choice(available)
+            used_chapters.clear()
+
+        item = chapter_groups[ch][chapter_pos[ch]]
+        chapter_pos[ch] += 1
+        used_chapters.add(ch)
+
+        m_id = item[0]
+        if m_id not in selected_ids:
+            selected.append(m_id)
+            selected_ids.add(m_id)
 
     return selected
 
