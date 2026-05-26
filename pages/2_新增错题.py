@@ -162,7 +162,7 @@ def _quick_entry_form():
             st.markdown(f"**📌 {qtype}（共 {capacity} 题）**")
             cols = st.columns(5)
             for i in range(1, capacity + 1):
-                key = f"qc_{qtype}_{i}"
+                key = f"qc_{chapter_id}_{qtype}_{i}"
                 already = f"{prefix}{i}" in existing
                 with cols[(i - 1) % 5]:
                     checked = st.checkbox(
@@ -181,7 +181,7 @@ def _quick_entry_form():
         count = 0
         for qtype, capacity, source_name, prefix in question_types:
             for i in range(1, capacity + 1):
-                key = f"qc_{qtype}_{i}"
+                key = f"qc_{chapter_id}_{qtype}_{i}"
                 if st.session_state.get(key, False):
                     title = generate_quick_title(qtype, chapter_num, i)
                     # 跳过已存在的

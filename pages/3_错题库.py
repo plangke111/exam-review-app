@@ -94,7 +94,7 @@ def _render_mistake_card(m):
                 st.caption(f"最近复习：{m['last_review_date']}  |  下次计划：{m['next_review_date'] or '未设定'}")
 
             st.markdown("---")
-            if m.get("image_path"):
+            if m["image_path"]:
                 _show_mistake_image(m["image_path"])
             st.markdown("**📄 题目内容**")
             st.text(m["content"] or "（无）")

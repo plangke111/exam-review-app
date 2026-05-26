@@ -63,7 +63,7 @@ def _render_task_card(task):
 
             st.markdown("---")
             # 显示题目图片
-            if task.get("image_path"):
+            if task["image_path"]:
                 _show_mistake_image(task["image_path"])
             st.markdown("**📄 题目内容**")
             st.text(task["content"] or "（无）")
