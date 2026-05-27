@@ -165,6 +165,9 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # 数据库迁移：为 exercises.name 添加唯一约束（防重复插入）
+    _migrate_exercises_unique(cursor)
+
     # 插入默认科目（如已存在则忽略）
     default_subjects = [
         ("高等数学", "数学课", 1),
@@ -262,6 +265,11 @@ def _init_default_chapters(cursor):
 
 def _init_exercises(cursor):
     """预置健身动作库（宿舍可用器械：弹力绳、哑铃、引体向上杆）。"""
+    # 已存在动作则跳过，防止每次 init_db() 重复插入
+    cursor.execute("SELECT COUNT(*) FROM exercises")
+    if cursor.fetchone()[0] > 0:
+        return
+
     exercises = [
         # Pull Day (拉力日)
         ("引体向上",          "背部",   "引体向上杆", 3, "8-12", "pull",  "正手宽握，下巴过杠", 1),
@@ -306,6 +314,20 @@ def _init_fitness_settings(cursor):
         "INSERT OR IGNORE INTO fitness_settings (key, value) VALUES (?, ?)",
         ("start_date", today),
     )
+
+
+def _migrate_exercises_unique(cursor):
+    """清理 exercises 表重复数据并添加唯一索引。"""
+    try:
+        # 先清重：保留每组同名中 id 最小的那条
+        cursor.execute("""
+            DELETE FROM exercises WHERE id NOT IN (
+                SELECT MIN(id) FROM exercises GROUP BY name
+            )
+        """)
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_name ON exercises(name)")
+    except sqlite3.OperationalError:
+        pass
 
 
 if __name__ == "__main__":
