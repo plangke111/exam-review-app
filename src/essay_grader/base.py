@@ -21,7 +21,7 @@ class BaseGrader:
         else:
             # OpenAI 兼容模式（DeepSeek / OpenAI / 其他）
             base_url = DEEPSEEK_BASE_URL if self.provider == "deepseek" else None
-            self.client = OpenAI(api_key=API_KEY, base_url=base_url)
+            self.client = OpenAI(api_key=API_KEY, base_url=base_url, timeout=120.0)
             self._mode = "openai"
 
         self.model = MODEL_NAME

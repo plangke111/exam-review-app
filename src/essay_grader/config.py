@@ -64,7 +64,7 @@ def _detect_provider():
     return "deepseek"  # 默认
 
 LLM_PROVIDER = _detect_provider()
-TEMPERATURE = 0.1
+TEMPERATURE = 0.0
 
 # DeepSeek 配置
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
