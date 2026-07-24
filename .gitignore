@@ -9,3 +9,12 @@ __pycache__/
 
 # Data
 data/*.db
+
+# 敏感配置
+.env
+.streamlit/secrets.toml
+
+# 批改系统提示词（包含评分策略，不公开）
+prompts/*.md
+!prompts/*.sample
+!prompts/README.md
