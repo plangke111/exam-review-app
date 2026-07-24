@@ -308,4 +308,5 @@ with st.sidebar:
     else:
         st.caption("（未检测到提示词文件）")
     st.caption(f"提示词目录: `prompts/`")
-    st.caption(f"模型: `claude-sonnet-4-6` | temp=0.1")
+    from src.essay_grader.config import MODEL_NAME, LLM_PROVIDER
+    st.caption(f"提供商: `{LLM_PROVIDER}` | 模型: `{MODEL_NAME}` | temp=0.1")

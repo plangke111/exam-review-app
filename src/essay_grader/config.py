@@ -1,18 +1,22 @@
 """批改系统配置 —— 提示词从文件读取，API Key 从环境变量或 Streamlit secrets 获取
 
+支持的 LLM 提供商（自动检测或手动指定）：
+  - DeepSeek:  key 以 "sk-" 开头，base_url 为 https://api.deepseek.com
+  - Anthropic: key 以 "sk-ant-" 开头
+
 使用方式（三选一）：
-  1. 环境变量:  export ANTHROPIC_API_KEY="sk-ant-..."
-  2. Streamlit:  在 .streamlit/secrets.toml 中设置 ANTHROPIC_API_KEY
-  3. .env 文件:  在项目根目录创建 .env 文件，写入 ANTHROPIC_API_KEY=sk-ant-...
+  1. 环境变量:  export LLM_API_KEY="sk-..."
+  2. Streamlit:  在 .streamlit/secrets.toml 中设置 LLM_API_KEY
+  3. .env 文件:  在项目根目录创建 .env 文件，写入 LLM_API_KEY=sk-...
 """
 
 import os
 from pathlib import Path
 
-# === 项目根目录（自动检测） ===
+# === 项目根目录 ===
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
-# === 加载 .env 文件 ===
+# === 加载 .env ===
 def _load_dotenv():
     env_file = PROJECT_ROOT / ".env"
     if env_file.exists():
@@ -30,27 +34,42 @@ _load_dotenv()
 # === 提示词目录 ===
 PROMPTS_DIR = PROJECT_ROOT / "prompts"
 
-# === API 配置 ===
-# 优先级: 环境变量 > Streamlit secrets > .env 文件
-def _get_api_key():
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if key:
-        return key
+# === API Key ===
+def _get_config(key: str, default: str = "") -> str:
+    """获取配置，优先级: 环境变量 > Streamlit secrets > .env > default"""
+    val = os.environ.get(key)
+    if val:
+        return val
     try:
         import streamlit as st
-        key = st.secrets.get("ANTHROPIC_API_KEY", "")
-        if key:
-            return key
+        val = st.secrets.get(key, "")
+        if val:
+            return val
     except Exception:
         pass
-    return ""
+    return default
 
-API_KEY = _get_api_key()
-GRADING_MODEL = os.environ.get("GRADING_MODEL", "claude-sonnet-4-6")
+API_KEY = _get_config("LLM_API_KEY")
+MODEL_NAME = _get_config("LLM_MODEL", "deepseek-chat")
+
+# === 自动检测 LLM 提供商 ===
+def _detect_provider():
+    provider = _get_config("LLM_PROVIDER", "")
+    if provider in ("deepseek", "anthropic"):
+        return provider
+    if API_KEY.startswith("sk-ant-"):
+        return "anthropic"
+    if API_KEY.startswith("sk-"):
+        return "deepseek"
+    return "deepseek"  # 默认
+
+LLM_PROVIDER = _detect_provider()
 TEMPERATURE = 0.1
 
+# DeepSeek 配置
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
 # === 提示词文件映射 ===
-# 每个任务对应一个提示词文件名，放在 prompts/ 目录下
 PROMPT_FILES = {
     "english_big": "english_big.md",
     "english_small": "english_small.md",
@@ -60,13 +79,10 @@ PROMPT_FILES = {
 # === 提示词管理 ===
 
 def get_prompt_path(task_name: str) -> Path:
-    """获取提示词文件路径"""
     filename = PROMPT_FILES.get(task_name, f"{task_name}.md")
     return PROMPTS_DIR / filename
 
-
 def load_prompt(task_name: str) -> str:
-    """读取提示词文件内容"""
     path = get_prompt_path(task_name)
     if not path.exists():
         raise FileNotFoundError(
@@ -76,25 +92,14 @@ def load_prompt(task_name: str) -> str:
         )
     return path.read_text(encoding="utf-8")
 
-
 def list_available_prompts() -> dict[str, bool]:
-    """列出所有任务的提示词是否已就绪"""
-    return {
-        task: get_prompt_path(task).exists()
-        for task in PROMPT_FILES
-    }
-
+    return {task: get_prompt_path(task).exists() for task in PROMPT_FILES}
 
 def list_prompt_files() -> list[dict]:
-    """列出 prompts/ 目录下所有文件"""
     if not PROMPTS_DIR.exists():
         return []
     files = []
     for f in sorted(PROMPTS_DIR.iterdir()):
         if f.suffix in (".md", ".txt") and not f.name.endswith(".sample"):
-            files.append({
-                "task": f.stem,
-                "path": str(f),
-                "size": f.stat().st_size,
-            })
+            files.append({"task": f.stem, "path": str(f), "size": f.stat().st_size})
     return files
